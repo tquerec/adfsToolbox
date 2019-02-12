@@ -9,6 +9,45 @@ InModuleScope ADFSDiagnosticsModule {
     $sharedError = "Error message"
     $sharedErrorException = "System.Management.Automation.RuntimeException: Error message"
 
+    Describe "TestExtranetSmartLockoutConfiguration"{
+
+        It "should not run"{
+            Mock -CommandName Test-IsExtranetSmartLockoutEnabled  -MockWith { return $false}
+            Mock -CommandName GetObjectsFromAD -MockWith { return New-Object PSObject -Property @{ "ExtranetLockoutThreshold" = 0 } }
+            Mock -CommandName Retrieve-AdfsProperties -MockWith { return New-Object PSObject -Property @{ "Hostname" = $_hostname }}
+
+            $ret = TestExtranetSmartLockoutConfiguration
+
+            $ret.Result | should beexactly NotRun
+            $ret.Detail | should beexactly "Extranet Smart Lockout is not enabled."
+        }
+
+        It "should pass" {
+            Mock -CommandName Test-IsExtranetSmartLockoutEnabled  -MockWith { return $true}
+            Mock -CommandName GetObjectsFromAD -MockWith {return New-Object PSObject -Property @{ "LockoutThreshold" = 10 } }
+            Mock -CommandName Retrieve-AdfsProperties -MockWith { return New-Object PSObject -Property @{ "ExtranetLockoutThreshold" = 5 }}
+            $ret = TestExtranetSmartLockoutConfiguration
+
+            $ret.Result | should beexactly Pass        
+        }
+        It "should pass if AD lockout no enabled" {
+            Mock -CommandName Test-IsExtranetSmartLockoutEnabled  -MockWith { return $true}
+            Mock -CommandName GetObjectsFromAD -MockWith {return New-Object PSObject -Property @{ "LockoutThreshold" = 0 } }
+            Mock -CommandName Retrieve-AdfsProperties -MockWith { return New-Object PSObject -Property @{ "ExtranetLockoutThreshold" = 5 }}
+            $ret = TestExtranetSmartLockoutConfiguration
+
+            $ret.Result | should beexactly Pass        
+        }
+        It "should fail if AD lockout lt ADFS" {
+            Mock -CommandName Test-IsExtranetSmartLockoutEnabled  -MockWith { return $true}
+            Mock -CommandName GetObjectsFromAD -MockWith {return New-Object PSObject -Property @{ "LockoutThreshold" = 5 } }
+            Mock -CommandName Retrieve-AdfsProperties -MockWith { return New-Object PSObject -Property @{ "ExtranetLockoutThreshold" = 6 }}
+            $ret = TestExtranetSmartLockoutConfiguration
+
+            $ret.Result | should beexactly Fail        
+        }
+    }
+
     Describe "TestTrustedDevicesCertificateStore" {
         It "should pass" {
             # Arrange

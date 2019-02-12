@@ -1,4 +1,49 @@
-﻿# Windows Internal Database Service State if it is used by ADFS
+﻿Function TestExtranetSmartLockoutConfiguration()
+{
+    $testName = "ExtranetSmartLockoutConfiguration"
+    try
+    {
+        $eslTestResult = New-Object TestResult -ArgumentList($testName);
+
+        if ( $false -eq (Test-IsExtranetSmartLockoutEnabled) )
+        {
+            $eslTestResult.Result = [ResultType]::NotRun;
+            $eslTestResult.Detail = "Extranet Smart Lockout is not enabled.";    
+            return $eslTestResult;
+        }
+
+        try 
+        {
+            $defaultNamingContext = GetObjectsFromAD -domain "(objectclass=*)" -filter "(objectclass=*)"
+            $adLockoutThreshold = $defaultNamingContext.LockoutThreshold
+        }
+        catch [Exception]
+        {
+            return Create-ErrorExceptionTestResult $testName $_.Exception
+        }
+
+        $adfsProperties = Retrieve-AdfsProperties
+
+        if ( $adLockoutThreshold -gt 0 -and $adLockoutThreshold -lt $adfsProperties.ExtranetLockoutThreshold )
+        {
+            $eslTestResult.Result = [ResultType]::Fail;
+            $eslTestResult.Detail = "AD lockout threshold is: $adLockoutThreshold, ADFS extranet lockout threshold is " + $adfsProperties.ExtranetLockoutThreshold;
+        }
+        else 
+        {
+            $eslTestResult.Result = [ResultType]::Pass;
+        }
+        return $eslTestResult;
+        
+    }
+    catch [Exception]
+    {
+        return Create-ErrorExceptionTestResult $testName $_.Exception
+    }
+}
+
+
+# Windows Internal Database Service State if it is used by ADFS
 Function TestIsWidRunning()
 {
     $testName = "IsWidRunning"

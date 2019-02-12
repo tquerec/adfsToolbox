@@ -9,6 +9,65 @@ InModuleScope ADFSDiagnosticsModule {
     $sharedError = "Error message"
     $sharedErrorException = "System.Management.Automation.RuntimeException: Error message"
 
+    Describe "Test-IsExtranetSmartLockoutEnabled"{
+
+        It "should return false for Unknown OS"{
+            Mock -CommandName Get-OSVersion -MockWith { return [OSVersion]::Unknown }
+            Test-IsExtranetSmartLockoutEnabled | should beexactly $false
+        }
+        It "should return false for 2012"{
+            Mock -CommandName Get-OSVersion -MockWith { return [OSVersion]::WS2012 }
+            Test-IsExtranetSmartLockoutEnabled | should beexactly $false
+        }
+        It "should return false for 2012 R2"{
+            Mock -CommandName Get-OSVersion -MockWith { return [OSVersion]::WS2012R2 }
+            Test-IsExtranetSmartLockoutEnabled | should beexactly $false
+        }
+        It "should return false for 2016 without patch"{
+            Mock -CommandName Get-OSVersion -MockWith { return [OSVersion]::WS2016 }
+            Mock -CommandName Retrieve-AdfsProperties -MockWith { 
+                return New-Object PSObject -Property @{ "ExtranetLockoutEnabled" = $true}
+            }
+            Test-IsExtranetSmartLockoutEnabled | should beexactly $false
+        }
+        It "test combinations of ADFS properties"{
+            Mock -CommandName Get-OSVersion -MockWith { return [OSVersion]::WS2016 }
+            Mock -CommandName Retrieve-AdfsProperties -MockWith { 
+                if (-not ([System.Management.Automation.PSTypeName]'ExtranetLockoutModes').Type)
+                {
+                    Add-Type -TypeDefinition "
+                    public enum ExtranetLockoutModes
+                    {
+                       ADPasswordCounter,
+                       ADFSSmartLockoutEnforce,
+                       ADFSSmartLockoutLogOnly
+                    }"
+                }
+                return New-Object PSObject -Property @{ "ExtranetLockoutEnabled" = $true; "ExtranetLockoutMode" = [ExtranetLockoutModes]::ADFSSmartLockoutEnforce }
+            }
+
+            Test-IsExtranetSmartLockoutEnabled | should beexactly $true
+
+            Mock -CommandName Retrieve-AdfsProperties -MockWith { 
+                return New-Object PSObject -Property @{ "ExtranetLockoutEnabled" = $true; "ExtranetLockoutMode" = [ExtranetLockoutModes]::ADFSSmartLockoutLogOnly }
+            }
+
+            Test-IsExtranetSmartLockoutEnabled | should beexactly $true
+
+            Mock -CommandName Retrieve-AdfsProperties -MockWith { 
+                return New-Object PSObject -Property @{ "ExtranetLockoutEnabled" = $false; "ExtranetLockoutMode" = [ExtranetLockoutModes]::ADFSSmartLockoutLogOnly }
+            }
+
+            Test-IsExtranetSmartLockoutEnabled | should beexactly $false
+
+            Mock -CommandName Retrieve-AdfsProperties -MockWith { 
+                return New-Object PSObject -Property @{ "ExtranetLockoutEnabled" = $true; "ExtranetLockoutMode" = [ExtranetLockoutModes]::ADPasswordCounter }
+            }
+
+            Test-IsExtranetSmartLockoutEnabled | should beexactly $false
+        }
+    }
+
     Describe "Out-Verbose" {
         It "should call write-verbose" {
             # Arrange

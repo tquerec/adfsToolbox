@@ -112,6 +112,41 @@ Function Get-OsVersion
     return [OSVersion]::Unknown;
 }
 
+Function Test-IsExtranetSmartLockoutEnabled
+{
+    # ESL is supported on 2016 and later
+    $version = Get-OSVersion
+
+    if ( $version -eq [OSVersion]::Unknown)
+    {
+        return $false
+    }
+
+    if ( $version -eq [OSVersion]::WS2012 -or 
+         $version -eq [OSVersion]::WS2012R2 )
+    {
+        return $false
+    }
+
+    $ADFSProperties = Retrieve-AdfsProperties
+
+    # lockout is enabled
+    if ( $true -ne $ADFSProperties.ExtranetLockoutEnabled )
+    {
+        return $false
+    }
+
+    if(Get-Member -inputobject $ADFSProperties -name "ExtranetLockoutMode" -Membertype Properties)
+    {
+        # mode is enforce or log only
+        return ( [ExtranetLockoutModes]::AdfsSmartLockoutEnforce -eq $ADFSProperties.ExtranetLockoutMode -or 
+                 [ExtranetLockoutModes]::AdfsSmartLockoutLogOnly -eq $ADFSProperties.ExtranetLockoutMode)
+    }
+
+    # ExtranetLockoutMode not present, patch not installed on machine.
+    return $false
+}
+
 Function Import-ADFSAdminModule()
 {
     #Used to avoid extra calls to Add-PsSnapin so DFTs function appropriately on WS 2008 R2
